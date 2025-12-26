@@ -108,24 +108,32 @@ class CADGenerator:
                     faces.append(face_indices)
     
     def _smooth_mesh(self, vertices, faces, iterations=2):
-        """Apply Laplacian smoothing to mesh"""
+        """
+        Apply Laplacian smoothing to mesh
+        
+        NOTE: This implementation recalculates adjacency on each iteration.
+        For better performance with large meshes, consider building adjacency
+        structure once and reusing it.
+        """
         vertices = np.array(vertices, dtype=float)
         
+        # Build adjacency structure once (optimization)
+        adjacency = [[] for _ in range(len(vertices))]
+        for face in faces:
+            for i in range(3):
+                v1, v2 = face[i], face[(i+1)%3]
+                adjacency[v1].append(v2)
+                adjacency[v2].append(v1)
+        
+        # Remove duplicates in adjacency
+        adjacency = [list(set(neighbors)) for neighbors in adjacency]
+        
         for _ in range(iterations):
-            # Build adjacency
-            adjacency = [[] for _ in range(len(vertices))]
-            for face in faces:
-                for i in range(3):
-                    v1, v2 = face[i], face[(i+1)%3]
-                    adjacency[v1].append(v2)
-                    adjacency[v2].append(v1)
-            
-            # Smooth
+            # Smooth vertices based on pre-built adjacency
             new_vertices = vertices.copy()
             for i, neighbors in enumerate(adjacency):
                 if len(neighbors) > 0:
                     new_vertices[i] = 0.5 * vertices[i] + 0.5 * np.mean(vertices[neighbors], axis=0)
-            
             vertices = new_vertices
         
         return vertices

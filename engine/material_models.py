@@ -93,14 +93,16 @@ class CarbonFiberMaterial:
             c = np.cos(theta_rad)
             s = np.sin(theta_rad)
             
-            # Transformation matrix
-            T = np.array([
+            # Stress transformation matrix (Reuter matrix)
+            T_sigma = np.array([
                 [c**2, s**2, 2*s*c],
                 [s**2, c**2, -2*s*c],
                 [-s*c, s*c, c**2 - s**2]
             ])
             
-            Q = np.linalg.inv(T.T) @ Q @ np.linalg.inv(T)
+            # Transform stiffness matrix: Q_global = T_sigma^-T @ Q @ T_sigma^-1
+            T_inv = np.linalg.inv(T_sigma)
+            Q = T_inv.T @ Q @ T_inv
         
         return Q
     

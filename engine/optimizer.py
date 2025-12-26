@@ -188,9 +188,17 @@ class ChassisOptimizer:
         return fixed
     
     def _calculate_compliance(self, rho, penalty):
-        """Calculate structural compliance (simplified FEA)"""
-        # Simplified compliance calculation
-        # In full implementation, this would solve FEA system
+        """
+        Calculate structural compliance (simplified FEA)
+        
+        NOTE: This is a simplified compliance calculation for demonstration.
+        In a production implementation, this should solve the full FEA system:
+        K * U = F (stiffness × displacement = force)
+        Then calculate compliance as: C = U^T * K * U = U^T * F
+        
+        The current implementation provides a proxy metric for optimization
+        but should be replaced with proper finite element analysis.
+        """
         E_min = 1e-9  # Minimum stiffness to avoid singularity
         E_0 = 70e9    # Young's modulus for carbon fiber
         
@@ -198,6 +206,7 @@ class ChassisOptimizer:
         E = E_min + (E_0 - E_min) * rho**penalty
         
         # Simplified compliance (lower is better)
+        # This is a proxy - real implementation would solve FEA system
         compliance = np.sum(1.0 / E) / E.size
         
         return compliance
