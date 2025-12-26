@@ -1,7 +1,7 @@
 Flask==3.0.0
-numpy==1.24.3
-scipy==1.11.4
-trimesh==4.0.5
-plotly==5.18.0
+numpy>=1.24.0
+scipy>=1.11.0
+trimesh>=4.0.0
+plotly>=5.18.0
 python-dotenv==1.0.0
 Werkzeug==3.0.1
