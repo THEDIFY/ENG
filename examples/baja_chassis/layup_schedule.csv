@@ -1,0 +1,19 @@
+Ply Number,Material,Angle (deg),Thickness (mm),Zone,Coverage
+1,T700S/Epoxy,0,0.14,Full,100%
+2,T700S/Epoxy,45,0.14,Full,100%
+3,T700S/Epoxy,-45,0.14,Full,100%
+4,T700S/Epoxy,90,0.14,Full,100%
+5,T700S/Epoxy,0,0.14,Full,100%
+6,T700S/Epoxy,45,0.14,Full,100%
+7,T700S/Epoxy,-45,0.14,Full,100%
+8,T700S/Epoxy,90,0.14,Full,100%
+9,Woven Carbon/Epoxy,0,0.25,Roll Cage,100%
+10,Woven Carbon/Epoxy,0,0.25,Roll Cage,100%
+11,T700S/Epoxy,90,0.14,Full,100%
+12,T700S/Epoxy,-45,0.14,Full,100%
+13,T700S/Epoxy,45,0.14,Full,100%
+14,T700S/Epoxy,0,0.14,Full,100%
+15,T700S/Epoxy,90,0.14,Full,100%
+16,T700S/Epoxy,-45,0.14,Full,100%
+17,T700S/Epoxy,45,0.14,Full,100%
+18,T700S/Epoxy,0,0.14,Full,100%
