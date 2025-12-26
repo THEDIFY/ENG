@@ -68,7 +68,7 @@ class CADOutputGenerator:
             # Binary STL header
             with open(filepath, 'wb') as f:
                 f.write(b'Topology Optimized Chassis' + b' ' * (80 - 26))
-                f.write(num_triangles.to_bytes(4, 'little'))
+                f.write(int(num_triangles).to_bytes(4, 'little'))
                 # Triangle data would be written here
         else:
             # ASCII STL
