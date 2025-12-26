@@ -1,0 +1,196 @@
+{
+  "name": "Baja 1000 Trophy Truck - Example Project",
+  "description": "Example topology optimization project for a carbon fiber trophy truck chassis",
+  "rules_config": {
+    "rule_set_version": "2024",
+    "constraints": [],
+    "max_width": 2438,
+    "max_length": 5588,
+    "min_ground_clearance": 254,
+    "wheelbase_min": 2540,
+    "wheelbase_max": 3556
+  },
+  "components_config": {
+    "components": [
+      {
+        "component_id": "engine_001",
+        "name": "LS3 V8 Engine",
+        "component_type": "engine",
+        "position": [1500, 0, 300],
+        "orientation": [0, 0, 0],
+        "bounding_box": [600, 550, 600],
+        "mass": 180,
+        "cg_offset": [0, 0, 150],
+        "clearance_required": 50
+      },
+      {
+        "component_id": "trans_001",
+        "name": "4L80E Transmission",
+        "component_type": "transmission",
+        "position": [1900, 0, 250],
+        "orientation": [0, 0, 0],
+        "bounding_box": [500, 350, 400],
+        "mass": 75,
+        "clearance_required": 30
+      },
+      {
+        "component_id": "fuel_001",
+        "name": "55 Gallon Fuel Cell",
+        "component_type": "fuel_cell",
+        "position": [2400, 0, 400],
+        "orientation": [0, 0, 0],
+        "bounding_box": [600, 500, 400],
+        "mass": 45,
+        "clearance_required": 100
+      },
+      {
+        "component_id": "radiator_001",
+        "name": "Dual Pass Radiator",
+        "component_type": "radiator",
+        "position": [300, 0, 600],
+        "orientation": [0, 0, 0],
+        "bounding_box": [100, 700, 500],
+        "mass": 15,
+        "clearance_required": 50
+      },
+      {
+        "component_id": "driver_001",
+        "name": "Driver Seat",
+        "component_type": "driver_seat",
+        "position": [900, -300, 400],
+        "orientation": [0, 0, 0],
+        "bounding_box": [500, 500, 900],
+        "mass": 15,
+        "clearance_required": 50
+      },
+      {
+        "component_id": "codriver_001",
+        "name": "Co-Driver Seat",
+        "component_type": "co_driver_seat",
+        "position": [900, 300, 400],
+        "orientation": [0, 0, 0],
+        "bounding_box": [500, 500, 900],
+        "mass": 15,
+        "clearance_required": 50
+      }
+    ]
+  },
+  "design_space_config": {
+    "design_volume": {
+      "type": "box",
+      "origin": [0, -1000, 0],
+      "dimensions": [3200, 2000, 1200]
+    },
+    "keep_out_zones": [],
+    "symmetry_plane": "xz",
+    "minimum_member_size": 5.0,
+    "maximum_member_size": 100.0
+  },
+  "load_cases": {
+    "mission_profile": "baja_1000",
+    "load_cases": [
+      {
+        "name": "Maximum Vertical (5g Landing)",
+        "load_type": "dynamic",
+        "description": "Jump landing at full weight",
+        "accelerations": [0, 0, -49.05],
+        "safety_factor": 1.5,
+        "load_factor": 1.0
+      },
+      {
+        "name": "Maximum Lateral (2g Cornering)",
+        "load_type": "static",
+        "description": "High-speed cornering",
+        "accelerations": [0, 19.62, -9.81],
+        "safety_factor": 1.5,
+        "load_factor": 1.0
+      },
+      {
+        "name": "Maximum Braking (1.5g)",
+        "load_type": "static",
+        "description": "Emergency braking",
+        "accelerations": [-14.72, 0, -9.81],
+        "safety_factor": 1.5,
+        "load_factor": 1.0
+      },
+      {
+        "name": "Front Impact",
+        "load_type": "impact",
+        "description": "15 m/s frontal impact",
+        "forces": [
+          {
+            "location": "front_bumper",
+            "magnitude": 100000,
+            "direction": [1, 0, 0]
+          }
+        ],
+        "safety_factor": 1.25,
+        "load_factor": 1.0
+      },
+      {
+        "name": "Rollover Crush",
+        "load_type": "static",
+        "description": "FIA-style roof crush test",
+        "forces": [
+          {
+            "location": "roll_cage_top",
+            "magnitude": 50000,
+            "direction": [0, 0, -1]
+          }
+        ],
+        "safety_factor": 1.5,
+        "load_factor": 1.0
+      }
+    ],
+    "max_vertical_g": 5.0,
+    "max_lateral_g": 2.0,
+    "max_braking_g": 1.5,
+    "impact_velocity": 15.0,
+    "roll_over_scenario": true
+  },
+  "materials_config": {
+    "primary_material": "T700S/Epoxy",
+    "secondary_material": "Woven Carbon/Epoxy",
+    "materials": [
+      {
+        "name": "T700S/Epoxy",
+        "e1": 165.0,
+        "e2": 10.5,
+        "g12": 5.5,
+        "nu12": 0.28,
+        "xt": 2550.0,
+        "xc": 1600.0,
+        "yt": 55.0,
+        "yc": 220.0,
+        "s12": 85.0,
+        "density": 1570.0,
+        "ply_thickness": 0.14
+      }
+    ]
+  },
+  "manufacturing_config": {
+    "allowed_ply_angles": [0, 45, -45, 90],
+    "min_ply_thickness": 0.14,
+    "max_ply_drops_per_zone": 4,
+    "max_consecutive_same_angle": 4,
+    "enforce_symmetry": true,
+    "enforce_balance": true,
+    "max_shear_angle": 45.0,
+    "min_radius": 10.0,
+    "draft_angle": 3.0
+  },
+  "optimization_params": {
+    "method": "simp",
+    "volume_fraction": 0.3,
+    "penalty_factor": 3.0,
+    "filter_radius": 2.0,
+    "max_iterations": 200,
+    "convergence_tolerance": 0.01,
+    "move_limit": 0.2,
+    "compliance_weight": 1.0,
+    "mass_weight": 0.5,
+    "aero_weight": 0.3,
+    "aero_coupling": true,
+    "aero_update_interval": 50
+  }
+}
