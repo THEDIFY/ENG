@@ -64,6 +64,9 @@ class ManufacturingReport:
 class ManufacturingValidator:
     """Validator for composite manufacturing constraints."""
 
+    # Default limit for number of problem regions to report
+    DEFAULT_MAX_PROBLEM_REGIONS = 5
+
     def __init__(
         self,
         max_shear_angle: float = 45.0,
@@ -71,6 +74,7 @@ class ManufacturingValidator:
         draft_angle: float = 3.0,
         max_ply_drops_per_zone: int = 4,
         min_ply_thickness: float = 0.2,
+        max_problem_regions: int = None,
     ):
         """Initialize manufacturing validator.
 
@@ -80,12 +84,14 @@ class ManufacturingValidator:
             draft_angle: Minimum draft angle for mold release (degrees)
             max_ply_drops_per_zone: Maximum ply drops in one zone
             min_ply_thickness: Minimum ply thickness (mm)
+            max_problem_regions: Maximum number of problem regions to report
         """
         self.max_shear_angle = max_shear_angle
         self.min_radius = min_radius
         self.draft_angle = draft_angle
         self.max_ply_drops_per_zone = max_ply_drops_per_zone
         self.min_ply_thickness = min_ply_thickness
+        self.max_problem_regions = max_problem_regions or self.DEFAULT_MAX_PROBLEM_REGIONS
 
     def validate_layup(
         self,
@@ -254,7 +260,7 @@ class ManufacturingValidator:
 
             # Find elements exceeding limit
             high_shear_elements = np.where(shear_angles > self.max_shear_angle)[0]
-            for elem_id in high_shear_elements[:5]:  # Limit to 5 regions
+            for elem_id in high_shear_elements[:self.max_problem_regions]:
                 problem_regions.append(
                     {
                         "element_id": int(elem_id),

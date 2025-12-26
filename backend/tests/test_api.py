@@ -1,6 +1,11 @@
 """Tests for the API endpoints."""
 
+import os
 import pytest
+
+# Set environment variable to use SQLite for testing before importing app
+os.environ["DATABASE_URL"] = "sqlite+aiosqlite:///./test.db"
+
 from fastapi.testclient import TestClient
 
 from app.main import app

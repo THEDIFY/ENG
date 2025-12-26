@@ -33,6 +33,18 @@ export default function OptimizationPage() {
     convergenceTolerance: 0.01,
   })
 
+  // Track interval reference for cleanup
+  const [intervalId, setIntervalId] = useState<ReturnType<typeof setInterval> | null>(null)
+
+  // Cleanup interval on unmount
+  useEffect(() => {
+    return () => {
+      if (intervalId) {
+        clearInterval(intervalId)
+      }
+    }
+  }, [intervalId])
+
   // Simulate optimization progress
   const runOptimization = () => {
     setOptimizationState((prev) => ({ ...prev, status: 'running', iteration: 0 }))
@@ -41,6 +53,7 @@ export default function OptimizationPage() {
       setOptimizationState((prev) => {
         if (prev.iteration >= config.maxIterations || prev.convergence < config.convergenceTolerance) {
           clearInterval(interval)
+          setIntervalId(null)
           return { ...prev, status: 'completed' }
         }
         
@@ -56,6 +69,8 @@ export default function OptimizationPage() {
         }
       })
     }, 100)
+    
+    setIntervalId(interval)
   }
 
   return (

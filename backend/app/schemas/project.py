@@ -310,7 +310,7 @@ class OutputResponse(BaseSchema):
     filename: str
     file_size: Optional[int]
     mime_type: Optional[str]
-    metadata: Optional[Dict[str, Any]]
+    output_metadata: Optional[Dict[str, Any]]
     created_at: datetime
 
 

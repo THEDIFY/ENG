@@ -182,8 +182,8 @@ class ProjectOutput(Base):
     file_size: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
     mime_type: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
     
-    # Metadata
-    metadata: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
+    # Output metadata
+    output_metadata: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
 
     # Timestamps
     created_at: Mapped[datetime] = mapped_column(

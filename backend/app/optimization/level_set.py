@@ -250,12 +250,24 @@ class LevelSetOptimizer:
         dphi_dy_p[:, :-1] = phi[:, 1:] - phi[:, :-1]
         dphi_dy_m[:, 1:] = phi[:, 1:] - phi[:, :-1]
         
-        # Upwind scheme
+        # Upwind scheme - use Godunov approach
+        # For positive velocity: use backward differences (dphi_m)
+        # For negative velocity: use forward differences (dphi_p)
         grad_sq = np.zeros_like(phi)
-        grad_sq += np.where(velocity >= 0, np.maximum(dphi_dx_m, 0) ** 2, np.minimum(dphi_dx_p, 0) ** 2)
-        grad_sq += np.where(velocity >= 0, np.maximum(dphi_dy_m, 0) ** 2, np.minimum(dphi_dy_p, 0) ** 2)
-        grad_sq += np.where(velocity < 0, np.minimum(dphi_dx_m, 0) ** 2, np.maximum(dphi_dx_p, 0) ** 2)
-        grad_sq += np.where(velocity < 0, np.minimum(dphi_dy_m, 0) ** 2, np.maximum(dphi_dy_p, 0) ** 2)
+        
+        # X direction
+        grad_sq += np.where(
+            velocity >= 0,
+            np.maximum(dphi_dx_m, 0) ** 2 + np.minimum(dphi_dx_p, 0) ** 2,
+            np.maximum(-dphi_dx_p, 0) ** 2 + np.minimum(-dphi_dx_m, 0) ** 2
+        )
+        
+        # Y direction
+        grad_sq += np.where(
+            velocity >= 0,
+            np.maximum(dphi_dy_m, 0) ** 2 + np.minimum(dphi_dy_p, 0) ** 2,
+            np.maximum(-dphi_dy_p, 0) ** 2 + np.minimum(-dphi_dy_m, 0) ** 2
+        )
         
         return np.sqrt(grad_sq)
 
