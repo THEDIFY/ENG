@@ -164,6 +164,15 @@ if __name__ == '__main__':
     os.makedirs('outputs', exist_ok=True)
     
     # Run on single port for both frontend and backend
+    # Note: Debug mode is enabled for development. 
+    # For production deployment, set debug=False and use a production WSGI server like gunicorn
     print("Starting Baja 1000 Chassis Optimizer...")
     print("Access the application at: http://localhost:5000")
-    app.run(host='0.0.0.0', port=5000, debug=True)
+    print("")
+    print("WARNING: Running in development mode. For production use, set debug=False")
+    print("         and use a production WSGI server (e.g., gunicorn, waitress)")
+    
+    # Get debug mode from environment variable, default to False for security
+    debug_mode = os.getenv('FLASK_DEBUG', 'False').lower() == 'true'
+    
+    app.run(host='0.0.0.0', port=5000, debug=debug_mode)

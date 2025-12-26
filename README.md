@@ -32,11 +32,24 @@ pip install -r requirements.txt
 
 Start the server (runs both backend and frontend on the same port):
 
+**Development mode (with debug):**
 ```bash
+export FLASK_DEBUG=true
 python app.py
+# Or use the convenience script:
+./run_dev.sh
+```
+
+**Production mode (secure):**
+```bash
+python run_production.py
+# Or simply:
+python app.py  # debug is off by default
 ```
 
 The application will be available at: **http://localhost:5000**
+
+⚠️ **Security Note:** Debug mode is disabled by default for security. Only enable it in development environments by setting the `FLASK_DEBUG=true` environment variable.
 
 ## Usage
 
