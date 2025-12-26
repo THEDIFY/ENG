@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Baja 1000 Chassis Optimizer</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+    <div class="header">
+        <h1>🏁 Baja 1000 Trophy Truck Chassis Optimizer</h1>
+        <p>Advanced topology optimization for high-performance off-road racing</p>
+    </div>
+
+    <div class="container">
+        <div class="input-section">
+            <h2>Design Inputs</h2>
+            
+            <!-- Race Rules -->
+            <div class="form-group">
+                <h3>Race Rules & Constraints</h3>
+                <div class="form-row">
+                    <label>Max Weight (kg): <input type="number" id="max_weight" value="1000" step="10"></label>
+                    <label>Max Length (m): <input type="number" id="max_length" value="5.0" step="0.1"></label>
+                </div>
+                <div class="form-row">
+                    <label>Max Width (m): <input type="number" id="max_width" value="2.2" step="0.1"></label>
+                    <label>Max Height (m): <input type="number" id="max_height" value="1.8" step="0.1"></label>
+                </div>
+                <div class="form-row">
+                    <label>Min Safety Factor: <input type="number" id="min_safety_factor" value="2.0" step="0.1"></label>
+                    <label>Max Drag Coefficient: <input type="number" id="max_drag_coefficient" value="0.6" step="0.01"></label>
+                </div>
+            </div>
+
+            <!-- Component Specs -->
+            <div class="form-group">
+                <h3>Component Specifications</h3>
+                <div class="form-row">
+                    <label>Estimated Vehicle Mass (kg): <input type="number" id="vehicle_mass" value="1500" step="50"></label>
+                    <label>Engine Power (HP): <input type="number" id="engine_power" value="850" step="10"></label>
+                </div>
+                <div class="form-row">
+                    <label>Suspension Travel (mm): <input type="number" id="suspension_travel" value="450" step="10"></label>
+                    <label>Wheel Diameter (inches): <input type="number" id="wheel_diameter" value="37" step="1"></label>
+                </div>
+            </div>
+
+            <!-- Mission Profile -->
+            <div class="form-group">
+                <h3>Mission Profile</h3>
+                <div class="form-row">
+                    <label>Max Speed (km/h): <input type="number" id="max_speed" value="160" step="5"></label>
+                    <label>Race Duration (hours): <input type="number" id="race_duration" value="24" step="1"></label>
+                </div>
+                <div class="form-row">
+                    <label>
+                        Terrain Roughness:
+                        <select id="terrain_roughness">
+                            <option value="smooth">Smooth</option>
+                            <option value="medium" selected>Medium</option>
+                            <option value="rough">Rough</option>
+                            <option value="extreme">Extreme</option>
+                        </select>
+                    </label>
+                    <label>
+                        Primary Material:
+                        <select id="material_type">
+                            <option value="T300_Epoxy">T300/Epoxy (Standard)</option>
+                            <option value="T800_Epoxy" selected>T800/Epoxy (Intermediate)</option>
+                            <option value="M40J_Epoxy">M40J/Epoxy (High Modulus)</option>
+                        </select>
+                    </label>
+                </div>
+            </div>
+
+            <button id="optimizeBtn" class="btn-primary">Run Optimization</button>
+        </div>
+
+        <div class="results-section" id="resultsSection" style="display: none;">
+            <h2>Optimization Results</h2>
+            
+            <div id="statusMessage" class="status-message"></div>
+            
+            <div class="metrics-grid" id="metricsGrid"></div>
+            
+            <div class="validation-results" id="validationResults"></div>
+            
+            <div class="downloads" id="downloadSection">
+                <h3>Download Files</h3>
+                <div class="download-buttons" id="downloadButtons"></div>
+            </div>
+        </div>
+
+        <div class="loading" id="loadingIndicator" style="display: none;">
+            <div class="spinner"></div>
+            <p>Running topology optimization... This may take a minute.</p>
+        </div>
+    </div>
+
+    <script src="/static/js/app.js"></script>
+</body>
+</html>
