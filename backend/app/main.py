@@ -63,6 +63,12 @@ app.include_router(rules_router, prefix=settings.api_prefix)
 
 # Serve static files (frontend)
 static_dir = Path(__file__).parent.parent / "static"
+
+# Mount models directory for GLTF files
+models_dir = static_dir / "models"
+models_dir.mkdir(parents=True, exist_ok=True)
+app.mount("/static/models", StaticFiles(directory=str(models_dir)), name="models")
+
 if static_dir.exists() and (static_dir / "index.html").exists():
     # Mount static assets
     if (static_dir / "assets").exists():

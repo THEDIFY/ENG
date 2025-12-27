@@ -1,5 +1,5 @@
-import { useState, useCallback } from 'react'
-import { useQuery, useMutation } from '@tanstack/react-query'
+import { useState } from 'react'
+import { useQuery } from '@tanstack/react-query'
 import { rulesApi } from '../api/rules'
 
 interface Rule {

@@ -1,9 +1,12 @@
 """Project API router."""
 
-from typing import List
+import os
+from datetime import datetime
+from typing import Any, Dict, List, Optional
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
+from fastapi.responses import FileResponse
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -12,6 +15,7 @@ from app.models.project import (
     JobStatus,
     JobType,
     OptimizationJob,
+    OutputType,
     Project,
     ProjectOutput,
     ProjectStatus,
@@ -25,8 +29,18 @@ from app.schemas.project import (
     ProjectResponse,
     ProjectUpdate,
 )
+from app.services.orchestration import (
+    DesignSpaceBuilder,
+    LoadInferenceService,
+    ProjectOrchestrator,
+)
 
 router = APIRouter(prefix="/projects", tags=["projects"])
+
+# Initialize orchestrator
+STATIC_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "static", "models")
+os.makedirs(STATIC_DIR, exist_ok=True)
+orchestrator = ProjectOrchestrator(output_dir=STATIC_DIR)
 
 
 @router.post("/", response_model=ProjectResponse, status_code=status.HTTP_201_CREATED)
@@ -242,7 +256,15 @@ async def run_optimization(
     project_id: UUID,
     db: AsyncSession = Depends(get_db),
 ) -> OptimizationJob:
-    """Run topology optimization for a project."""
+    """Run topology optimization for a project.
+    
+    This endpoint runs the full optimization pipeline:
+    1. Auto-infers loads if none are defined
+    2. Builds design space if not configured
+    3. Runs topology optimization
+    4. Generates GLTF model for visualization
+    5. Updates project with results
+    """
     result = await db.execute(select(Project).where(Project.id == project_id))
     project = result.scalar_one_or_none()
     if not project:
@@ -262,23 +284,66 @@ async def run_optimization(
     
     # Update project status
     project.status = ProjectStatus.OPTIMIZING
+    await db.commit()
+    await db.refresh(db_job)
     
-    # Simulate some optimization results for demo
-    import random
-    project.optimization_results = {
-        "iterations": random.randint(100, 300),
-        "final_volume_fraction": round(random.uniform(0.25, 0.35), 3),
-        "final_compliance": round(random.uniform(0.001, 0.01), 6),
-        "mass_reduction": round(random.uniform(40, 60), 1),
-        "convergence_achieved": True,
-        "mesh_elements": random.randint(50000, 100000),
-        "density_field": [round(random.random(), 2) for _ in range(100)],
-    }
-    project.status = ProjectStatus.COMPLETED
-    
-    db_job.status = JobStatus.COMPLETED
-    db_job.progress = 100.0
-    db_job.results = project.optimization_results
+    try:
+        # Prepare project data
+        project_data = {
+            "rules_config": project.rules_config,
+            "components_config": project.components_config,
+            "design_space_config": project.design_space_config,
+            "load_cases": project.load_cases,
+            "materials_config": project.materials_config,
+            "manufacturing_config": project.manufacturing_config,
+            "optimization_params": project.optimization_params,
+        }
+        
+        # Run the full optimization pipeline
+        pipeline_results = await orchestrator.run_full_pipeline(
+            project_id=str(project_id),
+            project_data=project_data,
+        )
+        
+        # Update project with results
+        project.optimization_results = pipeline_results.get("optimization_results", {})
+        project.optimization_results["viewer_model_url"] = pipeline_results.get("artifacts", {}).get("viewer_model_url")
+        project.optimization_results["fe_results"] = pipeline_results.get("fe_results", {})
+        project.optimization_results["cfd_results"] = pipeline_results.get("cfd_results", {})
+        project.optimization_results["manufacturing_results"] = pipeline_results.get("manufacturing_results", {})
+        
+        # Update load_cases if auto-generated
+        if pipeline_results.get("load_cases", {}).get("auto_generated"):
+            project.load_cases = pipeline_results["load_cases"]
+        
+        # Update design_space if auto-generated
+        if pipeline_results.get("design_space", {}).get("auto_generated"):
+            project.design_space_config = pipeline_results["design_space"]
+        
+        project.status = ProjectStatus.COMPLETED
+        
+        db_job.status = JobStatus.COMPLETED
+        db_job.progress = 100.0
+        db_job.results = project.optimization_results
+        db_job.completed_at = datetime.utcnow()
+        
+        # Create output record for GLTF model
+        gltf_url = pipeline_results.get("artifacts", {}).get("viewer_model_url")
+        if gltf_url:
+            gltf_output = ProjectOutput(
+                project_id=project_id,
+                output_type=OutputType.GLTF,
+                filename="optimized.gltf",
+                file_path=gltf_url,
+                mime_type="model/gltf+json",
+                output_metadata={"generated_by": "optimization_pipeline"}
+            )
+            db.add(gltf_output)
+        
+    except Exception as e:
+        db_job.status = JobStatus.FAILED
+        db_job.error_message = str(e)
+        project.status = ProjectStatus.FAILED
     
     await db.commit()
     await db.refresh(db_job)
@@ -324,3 +389,270 @@ async def run_validation(
     await db.commit()
     
     return validation_results
+
+
+# New endpoints for orchestration pipeline
+
+@router.post("/{project_id}/infer_loads", response_model=dict)
+async def infer_loads(
+    project_id: UUID,
+    mission_profile: str = "baja_1000",
+    vehicle_mass_kg: float = 2500.0,
+    db: AsyncSession = Depends(get_db),
+) -> dict:
+    """Auto-generate load cases from mission profile and rules.
+    
+    This endpoint automatically infers load cases based on:
+    - Mission profile (baja_1000, desert_rally, rock_crawling)
+    - Vehicle mass
+    - Rules configuration
+    
+    Returns the generated load cases and updates the project.
+    """
+    result = await db.execute(select(Project).where(Project.id == project_id))
+    project = result.scalar_one_or_none()
+    if not project:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Project {project_id} not found",
+        )
+    
+    # Infer loads
+    load_cases = LoadInferenceService.infer_loads(
+        mission_profile=mission_profile,
+        rules_config=project.rules_config,
+        vehicle_mass_kg=vehicle_mass_kg,
+    )
+    
+    # Update project
+    project.load_cases = load_cases
+    project.status = ProjectStatus.LOADS_DEFINED
+    await db.commit()
+    
+    return load_cases
+
+
+@router.post("/{project_id}/build_design_space", response_model=dict)
+async def build_design_space(
+    project_id: UUID,
+    db: AsyncSession = Depends(get_db),
+) -> dict:
+    """Build design space from rules and component configuration.
+    
+    Automatically generates the design volume and keep-out zones
+    based on the project's rules and component placements.
+    """
+    result = await db.execute(select(Project).where(Project.id == project_id))
+    project = result.scalar_one_or_none()
+    if not project:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Project {project_id} not found",
+        )
+    
+    rules_config = project.rules_config or {}
+    components_config = project.components_config
+    
+    # Build design space
+    design_space = DesignSpaceBuilder.build_from_rules(
+        rules_config=rules_config,
+        components_config=components_config,
+    )
+    
+    # Update project
+    project.design_space_config = design_space
+    project.status = ProjectStatus.DESIGN_SPACE_GENERATED
+    await db.commit()
+    
+    return design_space
+
+
+@router.get("/{project_id}/viewer_model")
+async def get_viewer_model(
+    project_id: UUID,
+    db: AsyncSession = Depends(get_db),
+) -> dict:
+    """Get the URL for the project's 3D visualization model.
+    
+    Returns the GLTF model URL if optimization has completed,
+    or information about the current project state.
+    """
+    result = await db.execute(select(Project).where(Project.id == project_id))
+    project = result.scalar_one_or_none()
+    if not project:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Project {project_id} not found",
+        )
+    
+    # Check if optimization has completed and generated a model
+    opt_results = project.optimization_results or {}
+    viewer_model_url = opt_results.get("viewer_model_url")
+    
+    if viewer_model_url:
+        return {
+            "has_model": True,
+            "model_url": viewer_model_url,
+            "model_type": "gltf",
+            "status": "ready",
+            "optimization_complete": True,
+            "mass_reduction": opt_results.get("mass_reduction"),
+            "volume_fraction": opt_results.get("final_volume_fraction"),
+        }
+    else:
+        return {
+            "has_model": False,
+            "model_url": None,
+            "status": project.status.value if project.status else "unknown",
+            "optimization_complete": False,
+            "message": "Run optimization to generate the 3D model"
+        }
+
+
+@router.get("/{project_id}/status")
+async def get_project_status(
+    project_id: UUID,
+    db: AsyncSession = Depends(get_db),
+) -> dict:
+    """Get comprehensive project status including all pipeline stages.
+    
+    Returns the current state of each pipeline stage and any artifacts.
+    """
+    result = await db.execute(select(Project).where(Project.id == project_id))
+    project = result.scalar_one_or_none()
+    if not project:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Project {project_id} not found",
+        )
+    
+    # Calculate loads count
+    load_cases = project.load_cases or {}
+    loads_count = len(load_cases.get("load_cases", []))
+    
+    # Build status response
+    return {
+        "project_id": str(project.id),
+        "name": project.name,
+        "status": project.status.value if project.status else "draft",
+        "stages": {
+            "rules_parsed": project.rules_config is not None,
+            "components_placed": project.components_config is not None,
+            "design_space_generated": project.design_space_config is not None,
+            "loads_defined": loads_count > 0,
+            "loads_count": loads_count,
+            "loads_auto_generated": load_cases.get("auto_generated", False),
+            "materials_assigned": project.materials_config is not None,
+            "manufacturing_configured": project.manufacturing_config is not None,
+            "optimization_complete": project.optimization_results is not None,
+            "validation_complete": project.validation_results is not None,
+        },
+        "optimization_params": project.optimization_params,
+        "optimization_results": project.optimization_results,
+        "validation_results": project.validation_results,
+        "artifacts": {
+            "viewer_model_url": (project.optimization_results or {}).get("viewer_model_url"),
+        },
+        "created_at": project.created_at.isoformat() if project.created_at else None,
+        "updated_at": project.updated_at.isoformat() if project.updated_at else None,
+    }
+
+
+@router.post("/{project_id}/upload_model")
+async def upload_model(
+    project_id: UUID,
+    file: UploadFile = File(...),
+    db: AsyncSession = Depends(get_db),
+) -> dict:
+    """Upload an existing 3D model (STEP/IGES/STL/GLTF) for the project.
+    
+    The uploaded model will be converted to GLTF for visualization
+    and can be used as the basis for FE/CFD analysis and optimization.
+    """
+    result = await db.execute(select(Project).where(Project.id == project_id))
+    project = result.scalar_one_or_none()
+    if not project:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Project {project_id} not found",
+        )
+    
+    # Validate file extension
+    allowed_extensions = {'.step', '.stp', '.iges', '.igs', '.stl', '.gltf', '.glb'}
+    filename = file.filename or "model"
+    ext = os.path.splitext(filename)[1].lower()
+    
+    if ext not in allowed_extensions:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Unsupported file format. Allowed: {', '.join(allowed_extensions)}"
+        )
+    
+    # Create project directory
+    project_dir = os.path.join(STATIC_DIR, str(project_id))
+    os.makedirs(project_dir, exist_ok=True)
+    
+    # Save uploaded file
+    upload_path = os.path.join(project_dir, f"uploaded{ext}")
+    content = await file.read()
+    with open(upload_path, "wb") as f:
+        f.write(content)
+    
+    # For now, if it's already GLTF, use it directly
+    # In production, would convert STEP/IGES/STL to GLTF
+    if ext in {'.gltf', '.glb'}:
+        gltf_path = os.path.join(project_dir, "imported.gltf")
+        with open(gltf_path, "wb") as f:
+            f.write(content)
+        viewer_url = f"/static/models/{project_id}/imported.gltf"
+    else:
+        # Create a placeholder GLTF (in production, would use CAD conversion)
+        viewer_url = f"/static/models/{project_id}/imported.gltf"
+        _create_placeholder_gltf(project_dir)
+    
+    # Update project with imported model info
+    project.design_space_config = project.design_space_config or {}
+    project.design_space_config["imported_model"] = {
+        "filename": filename,
+        "format": ext[1:].upper(),
+        "viewer_url": viewer_url,
+        "uploaded_at": datetime.utcnow().isoformat(),
+    }
+    
+    # Create output record
+    output = ProjectOutput(
+        project_id=project_id,
+        output_type=OutputType.GLTF,
+        filename=f"imported{ext}",
+        file_path=upload_path,
+        file_size=len(content),
+        mime_type=file.content_type,
+        output_metadata={"source": "upload", "original_filename": filename}
+    )
+    db.add(output)
+    await db.commit()
+    
+    return {
+        "success": True,
+        "filename": filename,
+        "format": ext[1:].upper(),
+        "viewer_url": viewer_url,
+        "message": "Model uploaded successfully"
+    }
+
+
+def _create_placeholder_gltf(project_dir: str) -> None:
+    """Create a placeholder GLTF file for non-GLTF uploads."""
+    import json
+    
+    gltf = {
+        "asset": {"version": "2.0", "generator": "Trophy Truck Optimizer - Import Placeholder"},
+        "scene": 0,
+        "scenes": [{"nodes": [0]}],
+        "nodes": [{"name": "ImportedModel", "mesh": 0}],
+        "meshes": [{"name": "Placeholder", "primitives": []}],
+    }
+    
+    gltf_path = os.path.join(project_dir, "imported.gltf")
+    with open(gltf_path, "w") as f:
+        json.dump(gltf, f)

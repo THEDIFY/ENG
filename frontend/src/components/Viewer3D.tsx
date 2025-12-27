@@ -1,14 +1,17 @@
-import { useRef, useState } from 'react'
+import { useRef, useState, useEffect, Suspense, Component, ErrorInfo, ReactNode } from 'react'
 import { Canvas, useFrame } from '@react-three/fiber'
-import { OrbitControls, Grid, Environment, PerspectiveCamera } from '@react-three/drei'
+import { OrbitControls, Grid, Environment, PerspectiveCamera, useGLTF, Center } from '@react-three/drei'
 import * as THREE from 'three'
 
 interface ViewerProps {
   geometry?: any
   densityField?: number[]
+  modelUrl?: string
   showGrid?: boolean
   showAxes?: boolean
   autoRotate?: boolean
+  onModelLoad?: () => void
+  onModelError?: (error: Error) => void
 }
 
 function ChassisPreview({ autoRotate = false }: { autoRotate?: boolean }) {
@@ -93,18 +96,184 @@ function DensityFieldVisualization({ densityField }: { densityField: number[] })
   )
 }
 
+// Component to load and display GLTF model
+// Using useGLTF with React Suspense for proper error handling
+function GLTFModelInner({ 
+  url, 
+  autoRotate = false, 
+}: { 
+  url: string
+  autoRotate?: boolean
+}) {
+  const groupRef = useRef<THREE.Group>(null)
+  const gltf = useGLTF(url)
+
+  useFrame((state) => {
+    if (groupRef.current && autoRotate) {
+      groupRef.current.rotation.y = state.clock.getElapsedTime() * 0.3
+    }
+  })
+
+  return (
+    <Center>
+      <group ref={groupRef}>
+        <primitive object={gltf.scene.clone()} scale={0.5} />
+      </group>
+    </Center>
+  )
+}
+
+// Error boundary fallback component
+function GLTFErrorFallback({ autoRotate = false }: { autoRotate?: boolean }) {
+  return <ChassisPreview autoRotate={autoRotate} />
+}
+
+// Wrapper component with error boundary behavior
+function GLTFModel({ 
+  url, 
+  autoRotate = false, 
+  onLoad, 
+  onError 
+}: { 
+  url: string
+  autoRotate?: boolean
+  onLoad?: () => void
+  onError?: (error: Error) => void
+}) {
+  const [hasError, setHasError] = useState(false)
+
+  useEffect(() => {
+    // Reset error state when URL changes
+    setHasError(false)
+  }, [url])
+
+  // Notify parent when component mounts successfully
+  useEffect(() => {
+    if (!hasError) {
+      // Small delay to allow GLTF to load via Suspense
+      const timer = setTimeout(() => {
+        onLoad?.()
+      }, 100)
+      return () => clearTimeout(timer)
+    }
+  }, [hasError, onLoad])
+
+  if (hasError) {
+    return <GLTFErrorFallback autoRotate={autoRotate} />
+  }
+
+  // Wrapped in ErrorBoundary-like logic using Suspense error handling
+  return (
+    <ErrorBoundaryGLTF onError={(e: Error) => { setHasError(true); onError?.(e) }}>
+      <GLTFModelInner url={url} autoRotate={autoRotate} />
+    </ErrorBoundaryGLTF>
+  )
+}
+
+// Simple error boundary for GLTF loading
+interface ErrorBoundaryProps {
+  children: ReactNode
+  onError?: (error: Error) => void
+}
+
+interface ErrorBoundaryState {
+  hasError: boolean
+}
+
+class ErrorBoundaryGLTF extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
+  constructor(props: ErrorBoundaryProps) {
+    super(props)
+    this.state = { hasError: false }
+  }
+
+  static getDerivedStateFromError(_: Error): ErrorBoundaryState {
+    return { hasError: true }
+  }
+
+  componentDidCatch(error: Error, errorInfo: ErrorInfo) {
+    console.error('GLTF loading error:', error, errorInfo)
+    this.props.onError?.(error)
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return null
+    }
+    return this.props.children
+  }
+}
+
+// Loading placeholder
+function LoadingPlaceholder() {
+  const meshRef = useRef<THREE.Mesh>(null)
+
+  useFrame((state) => {
+    if (meshRef.current) {
+      meshRef.current.rotation.y = state.clock.getElapsedTime()
+    }
+  })
+
+  return (
+    <mesh ref={meshRef}>
+      <boxGeometry args={[1, 1, 1]} />
+      <meshStandardMaterial color="#666" wireframe />
+    </mesh>
+  )
+}
+
 export default function Viewer3D({
   geometry: _geometry,
   densityField,
+  modelUrl,
   showGrid = true,
   showAxes = true,
   autoRotate = false,
+  onModelLoad,
+  onModelError,
 }: ViewerProps) {
   const [cameraPosition] = useState<[number, number, number]>([5, 5, 5])
   const [isAutoRotating, setIsAutoRotating] = useState(autoRotate)
+  const [modelLoaded, setModelLoaded] = useState(false)
+  const [loadError, setLoadError] = useState<string | null>(null)
+
+  const handleModelLoad = () => {
+    setModelLoaded(true)
+    setLoadError(null)
+    onModelLoad?.()
+  }
+
+  const handleModelError = (error: Error) => {
+    setLoadError(error.message)
+    onModelError?.(error)
+  }
+
+  // Determine what to render
+  const renderContent = () => {
+    // Priority 1: GLTF model URL
+    if (modelUrl) {
+      return (
+        <Suspense fallback={<LoadingPlaceholder />}>
+          <GLTFModel 
+            url={modelUrl} 
+            autoRotate={isAutoRotating}
+            onLoad={handleModelLoad}
+            onError={handleModelError}
+          />
+        </Suspense>
+      )
+    }
+    
+    // Priority 2: Density field visualization
+    if (densityField && densityField.length > 0) {
+      return <DensityFieldVisualization densityField={densityField} />
+    }
+    
+    // Priority 3: Sample chassis preview
+    return <ChassisPreview autoRotate={isAutoRotating} />
+  }
 
   return (
-    <div className="w-full h-full bg-secondary-900 rounded-lg overflow-hidden">
+    <div className="w-full h-full bg-secondary-900 rounded-lg overflow-hidden relative">
       <Canvas shadows>
         <PerspectiveCamera makeDefault position={cameraPosition} fov={50} />
         <OrbitControls enableDamping dampingFactor={0.05} />
@@ -143,12 +312,36 @@ export default function Viewer3D({
         {showAxes && <axesHelper args={[2]} />}
         
         {/* Content */}
-        {densityField ? (
-          <DensityFieldVisualization densityField={densityField} />
-        ) : (
-          <ChassisPreview autoRotate={isAutoRotating} />
-        )}
+        {renderContent()}
       </Canvas>
+      
+      {/* Model status indicator */}
+      {modelUrl && (
+        <div className="absolute top-4 right-4 text-xs">
+          {modelLoaded ? (
+            <span className="bg-green-600 text-white px-2 py-1 rounded">
+              ✓ Optimized Model Loaded
+            </span>
+          ) : loadError ? (
+            <span className="bg-red-600 text-white px-2 py-1 rounded">
+              ✗ Load Error
+            </span>
+          ) : (
+            <span className="bg-blue-600 text-white px-2 py-1 rounded animate-pulse">
+              Loading model...
+            </span>
+          )}
+        </div>
+      )}
+      
+      {/* Sample indicator when no project model */}
+      {!modelUrl && !densityField && (
+        <div className="absolute top-4 right-4 text-xs">
+          <span className="bg-gray-600 text-white px-2 py-1 rounded">
+            Sample Preview
+          </span>
+        </div>
+      )}
       
       {/* Controls overlay */}
       <div className="absolute bottom-4 left-4 text-white text-xs bg-black/50 px-3 py-2 rounded space-y-1">
