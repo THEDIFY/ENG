@@ -242,14 +242,22 @@ export default function ProjectDetail() {
           </div>
           <div className="h-96 relative">
             <Viewer3D 
-              densityField={project.optimization_results?.density_field}
+              modelUrl={project.optimization_results?.viewer_model_url}
+              densityField={!project.optimization_results?.viewer_model_url ? project.optimization_results?.density_field : undefined}
             />
             {loadCases.length > 0 && (
-              <div className="absolute top-4 right-4 bg-black/70 text-white text-xs px-3 py-2 rounded">
-                <p className="font-semibold mb-1">Applied Forces:</p>
-                {loadCases.map((f, i) => (
+              <div className="absolute top-4 left-4 bg-black/70 text-white text-xs px-3 py-2 rounded z-10">
+                <p className="font-semibold mb-1">Applied Forces ({loadCases.length}):</p>
+                {loadCases.slice(0, 3).map((f, i) => (
                   <p key={i}>{f.name}: {f.magnitude}N</p>
                 ))}
+                {loadCases.length > 3 && <p className="text-gray-400">+{loadCases.length - 3} more...</p>}
+              </div>
+            )}
+            {loadCases.length === 0 && project.load_cases?.load_cases?.length > 0 && (
+              <div className="absolute top-4 left-4 bg-blue-600/90 text-white text-xs px-3 py-2 rounded z-10">
+                <p className="font-semibold">⚡ Auto-Generated Loads</p>
+                <p>{project.load_cases.load_cases.length} load cases inferred</p>
               </div>
             )}
           </div>
@@ -262,7 +270,10 @@ export default function ProjectDetail() {
             <h2 className="font-semibold mb-4">Workflow Progress</h2>
             <div className="space-y-2">
               {workflowSteps.map((item) => {
-                const isConfigured = project[item.key]
+                // Special handling for loads - check load_cases.load_cases array
+                const isConfigured = item.key === 'load_cases' 
+                  ? (project.load_cases?.load_cases?.length > 0)
+                  : project[item.key]
                 const isClickable = item.key !== 'optimization_results' && item.key !== 'validation_results'
                 return (
                   <button
@@ -299,7 +310,7 @@ export default function ProjectDetail() {
             <div className="space-y-2">
               <button 
                 onClick={() => optimizeMutation.mutate()}
-                disabled={isOptimizing || !project.materials_config}
+                disabled={isOptimizing}
                 className="w-full px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 transition disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
               >
                 {isOptimizing ? (
@@ -320,11 +331,13 @@ export default function ProjectDetail() {
                 📦 Export Outputs
               </button>
             </div>
-            {!project.materials_config && (
-              <p className="text-xs text-orange-600 mt-2">
-                Configure materials to enable optimization
-              </p>
-            )}
+            <p className="text-xs text-gray-500 mt-2">
+              {!project.load_cases?.load_cases?.length 
+                ? '💡 Loads will be auto-generated from mission profile'
+                : !project.materials_config 
+                  ? '💡 Default carbon fiber material will be used'
+                  : '✓ Ready to optimize'}
+            </p>
           </div>
         </div>
       </div>
@@ -829,8 +842,10 @@ export default function ProjectDetail() {
             </div>
             <div className="flex justify-between">
               <span className="text-gray-500">Loads:</span>
-              <span className={project.load_cases ? 'text-green-600' : 'text-gray-400'}>
-                {project.load_cases ? `${loadCases.length} forces defined` : 'Not configured'}
+              <span className={project.load_cases?.load_cases?.length > 0 ? 'text-green-600' : 'text-orange-500'}>
+                {project.load_cases?.load_cases?.length > 0 
+                  ? `${project.load_cases.load_cases.length} load cases${project.load_cases.auto_generated ? ' (auto)' : ''}`
+                  : 'Will auto-generate on optimize'}
               </span>
             </div>
             <div className="flex justify-between">
@@ -843,6 +858,12 @@ export default function ProjectDetail() {
               <span className="text-gray-500">Status:</span>
               <span className="font-medium">{project.status?.replace(/_/g, ' ')}</span>
             </div>
+            {project.optimization_results?.viewer_model_url && (
+              <div className="flex justify-between">
+                <span className="text-gray-500">3D Model:</span>
+                <span className="text-green-600">✓ Ready</span>
+              </div>
+            )}
           </div>
         </div>
       </div>

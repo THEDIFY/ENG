@@ -42,6 +42,43 @@ export interface UpdateProjectRequest {
   optimization_params?: any
 }
 
+export interface ViewerModel {
+  has_model: boolean
+  model_url: string | null
+  model_type?: string
+  status: string
+  optimization_complete: boolean
+  mass_reduction?: number
+  volume_fraction?: number
+  message?: string
+}
+
+export interface ProjectStatus {
+  project_id: string
+  name: string
+  status: string
+  stages: {
+    rules_parsed: boolean
+    components_placed: boolean
+    design_space_generated: boolean
+    loads_defined: boolean
+    loads_count: number
+    loads_auto_generated: boolean
+    materials_assigned: boolean
+    manufacturing_configured: boolean
+    optimization_complete: boolean
+    validation_complete: boolean
+  }
+  optimization_params?: any
+  optimization_results?: any
+  validation_results?: any
+  artifacts: {
+    viewer_model_url?: string
+  }
+  created_at: string | null
+  updated_at: string | null
+}
+
 export const projectsApi = {
   list: async (): Promise<Project[]> => {
     const response = await api.get('/projects/')
@@ -87,6 +124,46 @@ export const projectsApi = {
 
   runOptimization: async (projectId: string, params?: any) => {
     const response = await api.post(`/projects/${projectId}/optimize`, params)
+    return response.data
+  },
+
+  runValidation: async (projectId: string) => {
+    const response = await api.post(`/projects/${projectId}/validate`)
+    return response.data
+  },
+
+  // New endpoints for orchestration pipeline
+
+  getViewerModel: async (projectId: string): Promise<ViewerModel> => {
+    const response = await api.get(`/projects/${projectId}/viewer_model`)
+    return response.data
+  },
+
+  getStatus: async (projectId: string): Promise<ProjectStatus> => {
+    const response = await api.get(`/projects/${projectId}/status`)
+    return response.data
+  },
+
+  inferLoads: async (projectId: string, missionProfile: string = 'baja_1000', vehicleMassKg: number = 2500) => {
+    const response = await api.post(`/projects/${projectId}/infer_loads`, null, {
+      params: { mission_profile: missionProfile, vehicle_mass_kg: vehicleMassKg }
+    })
+    return response.data
+  },
+
+  buildDesignSpace: async (projectId: string) => {
+    const response = await api.post(`/projects/${projectId}/build_design_space`)
+    return response.data
+  },
+
+  uploadModel: async (projectId: string, file: File) => {
+    const formData = new FormData()
+    formData.append('file', file)
+    const response = await api.post(`/projects/${projectId}/upload_model`, formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    })
     return response.data
   },
 
