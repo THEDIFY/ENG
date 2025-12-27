@@ -1,4 +1,4 @@
-import { useRef, useState, useEffect, Suspense } from 'react'
+import { useRef, useState, useEffect, Suspense, Component, ErrorInfo, ReactNode } from 'react'
 import { Canvas, useFrame } from '@react-three/fiber'
 import { OrbitControls, Grid, Environment, PerspectiveCamera, useGLTF, Center } from '@react-three/drei'
 import * as THREE from 'three'
@@ -97,6 +97,38 @@ function DensityFieldVisualization({ densityField }: { densityField: number[] })
 }
 
 // Component to load and display GLTF model
+// Using useGLTF with React Suspense for proper error handling
+function GLTFModelInner({ 
+  url, 
+  autoRotate = false, 
+}: { 
+  url: string
+  autoRotate?: boolean
+}) {
+  const groupRef = useRef<THREE.Group>(null)
+  const gltf = useGLTF(url)
+
+  useFrame((state) => {
+    if (groupRef.current && autoRotate) {
+      groupRef.current.rotation.y = state.clock.getElapsedTime() * 0.3
+    }
+  })
+
+  return (
+    <Center>
+      <group ref={groupRef}>
+        <primitive object={gltf.scene.clone()} scale={0.5} />
+      </group>
+    </Center>
+  )
+}
+
+// Error boundary fallback component
+function GLTFErrorFallback({ autoRotate = false }: { autoRotate?: boolean }) {
+  return <ChassisPreview autoRotate={autoRotate} />
+}
+
+// Wrapper component with error boundary behavior
 function GLTFModel({ 
   url, 
   autoRotate = false, 
@@ -108,43 +140,67 @@ function GLTFModel({
   onLoad?: () => void
   onError?: (error: Error) => void
 }) {
-  const groupRef = useRef<THREE.Group>(null)
-  const [error, setError] = useState<Error | null>(null)
-  
-  // Use try-catch for GLTF loading
-  let gltf: any = null
-  try {
-    gltf = useGLTF(url)
-  } catch (e: any) {
-    if (!error) {
-      setError(e)
-      onError?.(e)
-    }
-  }
+  const [hasError, setHasError] = useState(false)
 
   useEffect(() => {
-    if (gltf) {
-      onLoad?.()
-    }
-  }, [gltf, onLoad])
+    // Reset error state when URL changes
+    setHasError(false)
+  }, [url])
 
-  useFrame((state) => {
-    if (groupRef.current && autoRotate) {
-      groupRef.current.rotation.y = state.clock.getElapsedTime() * 0.3
+  // Notify parent when component mounts successfully
+  useEffect(() => {
+    if (!hasError) {
+      // Small delay to allow GLTF to load via Suspense
+      const timer = setTimeout(() => {
+        onLoad?.()
+      }, 100)
+      return () => clearTimeout(timer)
     }
-  })
+  }, [hasError, onLoad])
 
-  if (error || !gltf) {
-    return <ChassisPreview autoRotate={autoRotate} />
+  if (hasError) {
+    return <GLTFErrorFallback autoRotate={autoRotate} />
   }
 
+  // Wrapped in ErrorBoundary-like logic using Suspense error handling
   return (
-    <Center>
-      <group ref={groupRef}>
-        <primitive object={gltf.scene.clone()} scale={0.5} />
-      </group>
-    </Center>
+    <ErrorBoundaryGLTF onError={(e: Error) => { setHasError(true); onError?.(e) }}>
+      <GLTFModelInner url={url} autoRotate={autoRotate} />
+    </ErrorBoundaryGLTF>
   )
+}
+
+// Simple error boundary for GLTF loading
+interface ErrorBoundaryProps {
+  children: ReactNode
+  onError?: (error: Error) => void
+}
+
+interface ErrorBoundaryState {
+  hasError: boolean
+}
+
+class ErrorBoundaryGLTF extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
+  constructor(props: ErrorBoundaryProps) {
+    super(props)
+    this.state = { hasError: false }
+  }
+
+  static getDerivedStateFromError(_: Error): ErrorBoundaryState {
+    return { hasError: true }
+  }
+
+  componentDidCatch(error: Error, errorInfo: ErrorInfo) {
+    console.error('GLTF loading error:', error, errorInfo)
+    this.props.onError?.(error)
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return null
+    }
+    return this.props.children
+  }
 }
 
 // Loading placeholder

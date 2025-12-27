@@ -450,8 +450,6 @@ class OptimizationRunner:
         Returns:
             Optimization results with density field and metrics
         """
-        import numpy as np
-        
         # Extract parameters
         volume_fraction = optimization_params.get("volume_fraction", 0.3)
         penalty = optimization_params.get("penalty_factor", 3.0)
@@ -687,19 +685,20 @@ class ProjectOrchestrator:
             if progress_callback:
                 progress_callback(state)
             
-            # Simplified verification results
+            # Simplified verification results (deterministic mock values)
+            # In production, these would come from actual FE/CFD analysis
             fe_results = {
-                "max_displacement_mm": round(3.2 + np.random.random() * 2, 2),
-                "max_stress_mpa": round(180 + np.random.random() * 50, 1),
-                "safety_factor": round(1.8 + np.random.random() * 0.5, 2),
-                "first_mode_hz": round(45 + np.random.random() * 20, 1),
+                "max_displacement_mm": 4.2,
+                "max_stress_mpa": 205.0,
+                "safety_factor": 2.05,
+                "first_mode_hz": 55.3,
                 "passed": True
             }
             
             cfd_results = {
-                "drag_coefficient": round(0.52 + np.random.random() * 0.1, 3),
-                "lift_coefficient": round(0.12 + np.random.random() * 0.05, 3),
-                "drag_force_n": round(1200 + np.random.random() * 300, 0),
+                "drag_coefficient": 0.57,
+                "lift_coefficient": 0.15,
+                "drag_force_n": 1380.0,
                 "passed": True
             }
             
@@ -712,7 +711,7 @@ class ProjectOrchestrator:
             
             manufacturing_results = {
                 "drapability_valid": True,
-                "max_shear_angle_deg": round(35 + np.random.random() * 10, 1),
+                "max_shear_angle_deg": 40.5,
                 "ply_rules_valid": True,
                 "mold_manufacturable": True,
                 "violations": [],
@@ -784,7 +783,6 @@ class ProjectOrchestrator:
         import os
         import base64
         import struct
-        import numpy as np
         
         project_dir = os.path.join(self.output_dir, project_id)
         os.makedirs(project_dir, exist_ok=True)
