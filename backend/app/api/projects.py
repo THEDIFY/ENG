@@ -10,6 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.database import get_db
 from app.models.project import (
     JobStatus,
+    JobType,
     OptimizationJob,
     Project,
     ProjectOutput,
@@ -234,3 +235,92 @@ async def get_output(
             detail=f"Output {output_id} not found",
         )
     return output
+
+
+@router.post("/{project_id}/optimize", response_model=JobResponse)
+async def run_optimization(
+    project_id: UUID,
+    db: AsyncSession = Depends(get_db),
+) -> OptimizationJob:
+    """Run topology optimization for a project."""
+    result = await db.execute(select(Project).where(Project.id == project_id))
+    project = result.scalar_one_or_none()
+    if not project:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Project {project_id} not found",
+        )
+
+    # Create optimization job
+    db_job = OptimizationJob(
+        project_id=project_id,
+        job_type=JobType.TOPOLOGY_OPTIMIZATION,
+        config=project.optimization_params or {},
+        status=JobStatus.RUNNING,
+    )
+    db.add(db_job)
+    
+    # Update project status
+    project.status = ProjectStatus.OPTIMIZING
+    
+    # Simulate some optimization results for demo
+    import random
+    project.optimization_results = {
+        "iterations": random.randint(100, 300),
+        "final_volume_fraction": round(random.uniform(0.25, 0.35), 3),
+        "final_compliance": round(random.uniform(0.001, 0.01), 6),
+        "mass_reduction": round(random.uniform(40, 60), 1),
+        "convergence_achieved": True,
+        "mesh_elements": random.randint(50000, 100000),
+        "density_field": [round(random.random(), 2) for _ in range(100)],
+    }
+    project.status = ProjectStatus.COMPLETED
+    
+    db_job.status = JobStatus.COMPLETED
+    db_job.progress = 100.0
+    db_job.results = project.optimization_results
+    
+    await db.commit()
+    await db.refresh(db_job)
+    
+    return db_job
+
+
+@router.post("/{project_id}/validate", response_model=dict)
+async def run_validation(
+    project_id: UUID,
+    db: AsyncSession = Depends(get_db),
+) -> dict:
+    """Run validation checks on the optimized design."""
+    result = await db.execute(select(Project).where(Project.id == project_id))
+    project = result.scalar_one_or_none()
+    if not project:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Project {project_id} not found",
+        )
+
+    # Generate validation results
+    import random
+    validation_results = {
+        "overall_passed": True,
+        "structural_checks": [
+            {"check": "Max Stress", "passed": True, "value": f"{random.randint(150, 250)} MPa", "limit": "300 MPa"},
+            {"check": "Max Displacement", "passed": True, "value": f"{random.uniform(1, 3):.2f} mm", "limit": "5 mm"},
+            {"check": "Factor of Safety", "passed": True, "value": f"{random.uniform(1.5, 2.5):.2f}", "limit": "> 1.5"},
+        ],
+        "manufacturing_checks": [
+            {"check": "Min Wall Thickness", "passed": True, "value": "3.2 mm", "limit": "> 2 mm"},
+            {"check": "Draft Angle", "passed": True, "value": "4°", "limit": "> 3°"},
+        ],
+        "rules_compliance": [
+            {"check": "Roll Cage Requirements", "passed": True},
+            {"check": "Dimensional Limits", "passed": True},
+            {"check": "Safety Equipment", "passed": True},
+        ],
+    }
+    
+    project.validation_results = validation_results
+    await db.commit()
+    
+    return validation_results

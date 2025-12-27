@@ -1,10 +1,14 @@
 """FastAPI main application for Trophy Truck Topology Optimizer."""
 
+import os
 from contextlib import asynccontextmanager
+from pathlib import Path
 from typing import Any, Dict
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse
+from fastapi.staticfiles import StaticFiles
 
 from app.api.materials import router as materials_router
 from app.api.projects import router as projects_router
@@ -57,15 +61,49 @@ app.include_router(projects_router, prefix=settings.api_prefix)
 app.include_router(materials_router, prefix=settings.api_prefix)
 app.include_router(rules_router, prefix=settings.api_prefix)
 
+# Serve static files (frontend)
+static_dir = Path(__file__).parent.parent / "static"
+if static_dir.exists() and (static_dir / "index.html").exists():
+    # Mount static assets
+    if (static_dir / "assets").exists():
+        app.mount("/assets", StaticFiles(directory=str(static_dir / "assets")), name="assets")
+    
+    # Serve other static files (like favicon, manifest, etc.)
+    for item in static_dir.iterdir():
+        if item.is_file() and item.name != "index.html":
+            @app.get(f"/{item.name}")
+            async def serve_static_file(filename=item.name):
+                return FileResponse(str(static_dir / filename))
+
 
 @app.get("/")
-async def root() -> Dict[str, str]:
-    """Root endpoint."""
+async def root():
+    """Serve the frontend application."""
+    static_index = static_dir / "index.html"
+    if static_index.exists():
+        return FileResponse(str(static_index))
     return {
         "name": settings.app_name,
         "version": settings.app_version,
         "status": "running",
+        "message": "Frontend not built. Run 'npm run build' in frontend directory."
     }
+
+
+# Catch-all route for SPA - must be last
+@app.get("/{full_path:path}")
+async def serve_spa(full_path: str):
+    """Serve SPA for all non-API routes."""
+    # Don't intercept API routes
+    if full_path.startswith("api/"):
+        return {"error": "Not found"}
+    
+    # Serve index.html for all other routes (SPA routing)
+    static_index = static_dir / "index.html"
+    if static_index.exists():
+        return FileResponse(str(static_index))
+    
+    return {"error": "Frontend not available"}
 
 
 @app.get("/health")

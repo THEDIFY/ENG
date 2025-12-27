@@ -1,0 +1,35 @@
+# FastAPI and web framework
+fastapi
+uvicorn[standard]
+python-multipart
+pydantic>=2.0.0
+pydantic-settings
+
+# Database
+sqlalchemy
+aiosqlite
+asyncpg
+alembic
+psycopg[binary]
+
+# Background tasks and job queue
+celery
+redis
+
+# Utilities
+python-jose[cryptography]
+passlib[bcrypt]
+python-dotenv
+httpx
+aiofiles
+boto3
+
+# Testing
+pytest
+pytest-asyncio
+pytest-cov
+
+# Development
+black
+isort
+ruff

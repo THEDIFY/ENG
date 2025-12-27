@@ -84,4 +84,17 @@ export const projectsApi = {
     const response = await api.get(`/projects/${projectId}/outputs`)
     return response.data
   },
+
+  runOptimization: async (projectId: string, params?: any) => {
+    const response = await api.post(`/projects/${projectId}/optimize`, params)
+    return response.data
+  },
+
+  exportProject: async (projectId: string, format: string) => {
+    const response = await api.get(`/projects/${projectId}/export`, {
+      params: { format },
+      responseType: format === 'json' ? 'json' : 'blob',
+    })
+    return response.data
+  },
 }

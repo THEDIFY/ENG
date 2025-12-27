@@ -20,7 +20,7 @@ class Settings(BaseSettings):
     allowed_origins: List[str] = ["http://localhost:3000", "http://localhost:5173"]
 
     # Database
-    database_url: str = "postgresql+asyncpg://postgres:postgres@localhost:5432/topology_opt"
+    database_url: str = "sqlite+aiosqlite:///./topology_opt.db"
     database_echo: bool = False
 
     # Redis

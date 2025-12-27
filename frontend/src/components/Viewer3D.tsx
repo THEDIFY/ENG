@@ -8,20 +8,22 @@ interface ViewerProps {
   densityField?: number[]
   showGrid?: boolean
   showAxes?: boolean
+  autoRotate?: boolean
 }
 
-function ChassisPreview({ densityField }: { densityField?: number[] }) {
+function ChassisPreview({ autoRotate = false }: { autoRotate?: boolean }) {
   const meshRef = useRef<THREE.Mesh>(null)
+  const groupRef = useRef<THREE.Group>(null)
 
   useFrame((state) => {
-    if (meshRef.current) {
-      meshRef.current.rotation.y = state.clock.getElapsedTime() * 0.1
+    if (groupRef.current && autoRotate) {
+      groupRef.current.rotation.y = state.clock.getElapsedTime() * 0.3
     }
   })
 
   // Create a simple box geometry as placeholder for chassis
   return (
-    <group>
+    <group ref={groupRef}>
       {/* Main chassis body */}
       <mesh ref={meshRef} position={[0, 0.5, 0]}>
         <boxGeometry args={[3, 0.5, 1.5]} />
@@ -92,12 +94,14 @@ function DensityFieldVisualization({ densityField }: { densityField: number[] })
 }
 
 export default function Viewer3D({
-  geometry,
+  geometry: _geometry,
   densityField,
   showGrid = true,
   showAxes = true,
+  autoRotate = false,
 }: ViewerProps) {
   const [cameraPosition] = useState<[number, number, number]>([5, 5, 5])
+  const [isAutoRotating, setIsAutoRotating] = useState(autoRotate)
 
   return (
     <div className="w-full h-full bg-secondary-900 rounded-lg overflow-hidden">
@@ -142,13 +146,19 @@ export default function Viewer3D({
         {densityField ? (
           <DensityFieldVisualization densityField={densityField} />
         ) : (
-          <ChassisPreview />
+          <ChassisPreview autoRotate={isAutoRotating} />
         )}
       </Canvas>
       
       {/* Controls overlay */}
-      <div className="absolute bottom-4 left-4 text-white text-xs bg-black/50 px-2 py-1 rounded">
+      <div className="absolute bottom-4 left-4 text-white text-xs bg-black/50 px-3 py-2 rounded space-y-1">
         <p>Left-click: Rotate | Right-click: Pan | Scroll: Zoom</p>
+        <button
+          onClick={() => setIsAutoRotating(!isAutoRotating)}
+          className={`mt-1 px-2 py-1 rounded text-xs ${isAutoRotating ? 'bg-green-600' : 'bg-gray-600'} hover:opacity-80`}
+        >
+          {isAutoRotating ? '⏸ Stop Rotation' : '▶ Auto Rotate'}
+        </button>
       </div>
     </div>
   )

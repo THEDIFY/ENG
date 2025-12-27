@@ -18,6 +18,7 @@ export interface Project {
   validation_results?: ValidationResults
   created_at: string
   updated_at: string
+  [key: string]: any  // Allow dynamic property access
 }
 
 export type ProjectStatus =

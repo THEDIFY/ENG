@@ -33,5 +33,10 @@ async def get_db() -> AsyncSession:
 
 async def init_db() -> None:
     """Initialize database tables."""
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
+    try:
+        async with engine.begin() as conn:
+            await conn.run_sync(Base.metadata.create_all)
+    except Exception as e:
+        # Log but don't fail startup if database is unavailable
+        print(f"Warning: Could not initialize database: {e}")
+        print("Application will continue but database features may not work.")

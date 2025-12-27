@@ -13,7 +13,7 @@ interface OptimizationState {
 }
 
 export default function OptimizationPage() {
-  const { projectId } = useParams<{ projectId: string }>()
+  const { projectId: _projectId } = useParams<{ projectId: string }>()
   const [optimizationState, setOptimizationState] = useState<OptimizationState>({
     status: 'idle',
     iteration: 0,
